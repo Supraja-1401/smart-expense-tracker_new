@@ -1337,5 +1337,5 @@ app.get("/export-csv", requireAuth, async (req, res) => {
 
 // Start Server on 0.0.0.0:3000
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Expense Tracker running at http://0.0.0.0:${PORT}`);
+  console.log(`Expense Tracker running at http://localhost:${PORT}`);
 });

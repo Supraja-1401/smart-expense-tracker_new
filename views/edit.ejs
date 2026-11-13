@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Expense · Expense Tracker</title>
+    <!-- Prevent theme flicker on page load -->
+    <script>
+        (function() {
+            try {
+                const savedTheme = localStorage.getItem('theme');
+                if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                } else {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                }
+            } catch (e) {}
+        })();
+    </script>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+
+    <!-- NAVBAR -->
+    <header class="navbar">
+        <div class="logo-group">
+            <a href="/" class="logo">
+                <div class="logo-icon">₹</div>
+                <span>Expense Tracker</span>
+            </a>
+            <p class="nav-subtitle">Manage your money wisely</p>
+        </div>
+
+        <div class="nav-actions">
+            <a href="/" class="nav-btn nav-btn-primary">Back to Dashboard</a>
+        </div>
+    </header>
+
+    <!-- MAIN CONTAINER -->
+    <main class="container">
+
+        <!-- HERO -->
+        <section class="hero">
+            <p class="eyebrow">UPDATE TRANSACTION</p>
+            <h1>Edit your <span>expense.</span></h1>
+            <p class="hero-text">
+                Update the details below and save your changes.
+            </p>
+        </section>
+
+        <!-- EDIT FORM CARD -->
+        <section style="max-width: 600px; margin: 0 auto;">
+            <div class="card">
+                <div class="card-heading">
+                    <div>
+                        <p class="section-label">EDIT TRANSACTION</p>
+                        <h2>Update Expense Details</h2>
+                    </div>
+                    <div class="heading-icon">✎</div>
+                </div>
+
+                <form action="/update/<%= expense.id %>" method="POST">
+                    <!-- EXPENSE NAME -->
+                    <div class="form-group">
+                        <label for="expense_name">Expense Name</label>
+                        <input
+                            type="text"
+                            id="expense_name"
+                            name="expense_name"
+                            value="<%= expense.expense_name %>"
+                            required
+                        >
+                    </div>
+
+                    <!-- AMOUNT + CATEGORY -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="amount">Amount (₹)</label>
+                            <input
+                                type="number"
+                                id="amount"
+                                name="amount"
+                                value="<%= expense.amount %>"
+                                min="1"
+                                step="any"
+                                required
+                            >
+                        </div>
+
+                        <div class="form-group">
+                            <label for="category">Category</label>
+                            <select id="category" name="category" required>
+                                <option value="Food" <%= expense.category === 'Food' ? 'selected' : '' %>>Food</option>
+                                <option value="Travel" <%= expense.category === 'Travel' ? 'selected' : '' %>>Travel</option>
+                                <option value="Shopping" <%= expense.category === 'Shopping' ? 'selected' : '' %>>Shopping</option>
+                                <option value="Education" <%= expense.category === 'Education' ? 'selected' : '' %>>Education</option>
+                                <option value="Entertainment" <%= expense.category === 'Entertainment' ? 'selected' : '' %>>Entertainment</option>
+                                <option value="Health" <%= expense.category === 'Health' ? 'selected' : '' %>>Health</option>
+                                <option value="Bills" <%= expense.category === 'Bills' ? 'selected' : '' %>>Bills & Utilities</option>
+                                <option value="Other" <%= expense.category === 'Other' ? 'selected' : '' %>>Other</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- DATE -->
+                    <div class="form-group">
+                        <label for="date">Date</label>
+                        <input
+                            type="date"
+                            id="date"
+                            name="date"
+                            value="<%= expense.date %>"
+                            required
+                        >
+                    </div>
+
+                    <!-- DESCRIPTION -->
+                    <div class="form-group">
+                        <label for="description">Description</label>
+                        <textarea
+                            id="description"
+                            name="description"
+                            placeholder="Add a short description..."
+                        ><%= expense.description || '' %></textarea>
+                    </div>
+
+                    <!-- ACTIONS -->
+                    <div style="display: flex; gap: 10px; margin-top: 10px;">
+                        <a href="/" class="btn-secondary" style="text-align: center; flex: 1; padding: 11px;">Cancel</a>
+                        <button type="submit" class="btn-primary" style="flex: 2;">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer>
+        <p>Expense Tracker · Smart Personal Finance Management</p>
+    </footer>
+
+</body>
+
+</html>

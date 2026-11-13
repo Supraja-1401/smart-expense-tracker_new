@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Email OTP · Expense Tracker</title>
+    <!-- Prevent theme flicker on page load -->
+    <script>
+        (function() {
+            try {
+                const savedTheme = localStorage.getItem('theme');
+                if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                } else {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                }
+            } catch (e) {}
+        })();
+    </script>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+
+    <!-- NAVBAR -->
+    <header class="navbar">
+        <div class="logo-group">
+            <a href="/login" class="logo">
+                <div class="logo-icon">₹</div>
+                <span>Expense Tracker</span>
+            </a>
+        </div>
+        <p class="nav-subtitle">Secure Verification</p>
+        <div class="nav-actions">
+            <a href="/login" class="nav-btn nav-btn-primary">Cancel</a>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <main class="container auth-wrapper">
+        <div class="auth-split-container">
+            <!-- LEFT HERO / ANIMATED SHOWCASE -->
+            <div class="auth-hero-showcase">
+                <div class="auth-hero-badge">
+                    <span>🔐</span> Secure Verification
+                </div>
+                <h2 class="auth-hero-title">
+                    Instant & Password-Free <span>Email Security</span>
+                </h2>
+                <p class="auth-hero-desc">
+                    We keep your financial account safe with one-time verification codes sent directly to your email inbox.
+                </p>
+
+                <div class="auth-floating-cards">
+                    <div class="floating-preview-card floating-card-1">
+                        <div class="floating-card-icon">⚡</div>
+                        <div class="floating-card-info">
+                            <h4>Instant One-Time Code</h4>
+                            <p>Fast verification without storing passwords</p>
+                        </div>
+                        <div class="floating-card-amount">6-Digit</div>
+                    </div>
+
+                    <div class="floating-preview-card floating-card-2">
+                        <div class="floating-card-icon">🛡️</div>
+                        <div class="floating-card-info">
+                            <h4>Safe & Private Access</h4>
+                            <p>Your expenses and budget data are encrypted</p>
+                        </div>
+                        <div class="floating-card-amount">Secured</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT OTP FORM CARD -->
+            <div class="auth-card">
+                <div class="auth-header">
+                    <div class="auth-logo">🔐</div>
+                    <h1>Enter Verification Code</h1>
+                    <p>
+                        We sent a 6-digit security code to<br>
+                        <strong style="color: var(--green); word-break: break-all;"><%= email %></strong>
+                    </p>
+                </div>
+
+            <!-- ALERTS -->
+            <% if (typeof error_msg !== 'undefined' && error_msg) { %>
+                <div class="alert alert-error" style="margin-bottom: 16px;">
+                    <span><%= error_msg %></span>
+                </div>
+            <% } %>
+
+            <% if (typeof success_msg !== 'undefined' && success_msg) { %>
+                <div class="alert alert-success" style="margin-bottom: 16px;">
+                    <span><%= success_msg %></span>
+                </div>
+            <% } %>
+
+            <!-- DEV OTP PREVIEW HELPER -->
+            <% if (typeof dev_otp_preview !== 'undefined' && dev_otp_preview) { %>
+                <div class="alert alert-dev" style="margin-bottom: 16px; text-align: center;">
+                    <div><strong>Development Mode OTP:</strong></div>
+                    <div style="font-size: 20px; font-weight: bold; letter-spacing: 4px; color: var(--green); margin-top: 4px;">
+                        <%= dev_otp_preview %>
+                    </div>
+                    <small style="color: #666;">(Copy & paste the code above to test instantly)</small>
+                </div>
+            <% } %>
+
+            <!-- OTP FORM -->
+            <form action="/verify-otp" method="POST">
+                <input type="hidden" name="email" value="<%= email %>">
+                <input type="hidden" name="purpose" value="<%= typeof purpose !== 'undefined' ? purpose : 'register' %>">
+
+                <div class="otp-input-group">
+                    <input
+                        type="text"
+                        name="otp"
+                        id="otp-input"
+                        class="otp-box"
+                        placeholder="••••••"
+                        maxlength="6"
+                        pattern="[0-9]{6}"
+                        inputmode="numeric"
+                        autocomplete="one-time-code"
+                        required
+                        autofocus
+                    >
+                </div>
+
+                <button type="submit" class="btn-primary" style="margin-top: 10px;">
+                    Verify Code & Enter Dashboard →
+                </button>
+            </form>
+
+            <div class="otp-resend-row">
+                <span>Didn't receive the code?</span>
+                <form action="/resend-otp" method="POST" style="margin: 0;">
+                    <input type="hidden" name="email" value="<%= email %>">
+                    <button type="submit" class="otp-resend-btn" id="resend-btn">
+                        Resend OTP
+                    </button>
+                </form>
+            </div>
+
+            <div class="auth-footer">
+                <p>Wrong email? <a href="/login">Use another account</a></p>
+            </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- FOOTER -->
+    <footer>
+        <p>Expense Tracker · Smart Personal Finance Management</p>
+    </footer>
+
+    <script>
+        // Auto format and focus
+        const otpInput = document.getElementById('otp-input');
+        if (otpInput) {
+            otpInput.addEventListener('input', function (e) {
+                this.value = this.value.replace(/[^0-9]/g, '').slice(0, 6);
+            });
+        }
+    </script>
+</body>
+</html>

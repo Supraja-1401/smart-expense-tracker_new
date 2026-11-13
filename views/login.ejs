@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login · Expense Tracker</title>
+    <!-- Prevent theme flicker on page load -->
+    <script>
+        (function() {
+            try {
+                const savedTheme = localStorage.getItem('theme');
+                if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                } else {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                }
+            } catch (e) {}
+        })();
+    </script>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+
+    <!-- NAVBAR -->
+    <header class="navbar">
+        <div class="logo-group">
+            <a href="/login" class="logo">
+                <div class="logo-icon">₹</div>
+                <span>Expense Tracker</span>
+            </a>
+        </div>
+        <p class="nav-subtitle">Manage your money wisely</p>
+        <div class="nav-actions">
+            <a href="/register" class="nav-btn nav-btn-primary">Create Account</a>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <main class="container auth-wrapper">
+        <div class="auth-split-container">
+            <!-- LEFT HERO / ANIMATED SHOWCASE -->
+            <div class="auth-hero-showcase">
+                <div class="auth-hero-badge">
+                    <span>⚡</span> Instant Access
+                </div>
+                <h2 class="auth-hero-title">
+                    Welcome Back to Your <span>Financial Dashboard</span>
+                </h2>
+                <p class="auth-hero-desc">
+                    Log daily transactions, monitor your savings progress, and stay in complete control of your monthly budgets.
+                </p>
+
+                <div class="auth-floating-cards">
+                    <div class="floating-preview-card floating-card-1">
+                        <div class="floating-card-icon">💳</div>
+                        <div class="floating-card-info">
+                            <h4>Budget Status</h4>
+                            <p>Available Balance & Wallet Sync</p>
+                        </div>
+                        <div class="floating-card-amount">₹ Safe</div>
+                    </div>
+
+                    <div class="floating-preview-card floating-card-2">
+                        <div class="floating-card-icon">🔔</div>
+                        <div class="floating-card-info">
+                            <h4>Spending Alerts</h4>
+                            <p>Timely threshold notifications & tips</p>
+                        </div>
+                        <div class="floating-card-amount">Active</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT LOGIN FORM CARD -->
+            <div class="auth-card">
+                <div class="auth-header">
+                    <div class="auth-logo">₹</div>
+                    <h1>Sign In</h1>
+                    <p>Enter your credentials to access your dashboard</p>
+                </div>
+
+                <!-- ALERTS -->
+                <% if (typeof error_msg !== 'undefined' && error_msg) { %>
+                    <div class="alert alert-error" style="margin-bottom: 16px;">
+                        <span><%= error_msg %></span>
+                    </div>
+                <% } %>
+
+                <% if (typeof success_msg !== 'undefined' && success_msg) { %>
+                    <div class="alert alert-success" style="margin-bottom: 16px;">
+                        <span><%= success_msg %></span>
+                    </div>
+                <% } %>
+
+                <!-- EMAIL + PASSWORD LOGIN FORM -->
+                <form action="/login" method="POST">
+                    <div class="form-group">
+                        <label for="email">Email Address</label>
+                        <input
+                            type="email"
+                            id="email"
+                            name="email"
+                            value="<%= typeof email !== 'undefined' ? email : '' %>"
+                            placeholder="you@example.com"
+                            required
+                            autocomplete="email"
+                            autofocus
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                            <label for="password" style="margin-bottom: 0;">Password</label>
+                            <a href="/forgot-password" style="font-size: 11.5px; color: var(--green); text-decoration: none; font-weight: 600;">Forgot Password?</a>
+                        </div>
+                        <div class="password-input-wrapper">
+                            <input
+                                type="password"
+                                id="password"
+                                name="password"
+                                placeholder="Enter your password"
+                                required
+                                autocomplete="current-password"
+                            >
+                            <button
+                                type="button"
+                                class="password-toggle-btn"
+                                onclick="togglePasswordVisibility('password', this)"
+                                title="Toggle password view"
+                            >👁️</button>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-primary" style="margin-top: 10px;">
+                        Sign In →
+                    </button>
+                </form>
+
+                <div style="margin: 18px 0 12px; display: flex; align-items: center; gap: 10px;">
+                    <hr style="flex: 1; border: none; border-top: 1px solid #e8e2d4;">
+                    <span style="font-size: 12px; color: var(--muted); text-transform: uppercase;">or</span>
+                    <hr style="flex: 1; border: none; border-top: 1px solid #e8e2d4;">
+                </div>
+
+                <form action="/demo-login" method="POST" style="margin: 0;">
+                    <button type="submit" class="btn-secondary" style="width: 100%; justify-content: center;">
+                        ⚡ Quick Demo Account Sign In
+                    </button>
+                </form>
+
+                <div class="auth-footer">
+                    <p>New here? <a href="/register">Create Account</a></p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- FOOTER -->
+    <footer>
+        <p>Expense Tracker · Smart Personal Finance Management</p>
+    </footer>
+
+    <script>
+        function togglePasswordVisibility(inputId, btn) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            if (input.type === 'password') {
+                input.type = 'text';
+                btn.textContent = '🙈';
+            } else {
+                input.type = 'password';
+                btn.textContent = '👁️';
+            }
+        }
+    </script>
+</body>
+</html>

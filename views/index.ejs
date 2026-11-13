@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expense Tracker · Smart Personal Finance</title>
+    <!-- Prevent theme flicker on page load -->
+    <script>
+        (function() {
+            try {
+                const savedTheme = localStorage.getItem('theme');
+                if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                } else {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                }
+            } catch (e) {}
+        })();
+    </script>
+    <link rel="stylesheet" href="/static/style.css">
+    <!-- Chart.js for Visual Analytics (Pie / Doughnut Chart) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+
+<body>
+
+    <!-- =========================
+         TOP NAVIGATION BAR
+    ========================== -->
+    <header class="navbar">
+        <div class="logo-group">
+            <a href="/" class="logo">
+                <div class="logo-icon">₹</div>
+                <span>Expense Tracker</span>
+            </a>
+        </div>
+
+        <p class="nav-subtitle">Smart Personal Finance Management</p>
+
+        <div class="nav-right">
+            <!-- 1. THEME TOGGLE CIRCLE BUTTON (DARK / LIGHT MODE) -->
+            <button
+                type="button"
+                id="theme-toggle-btn"
+                class="nav-circle-btn"
+                onclick="toggleTheme()"
+                title="Switch Dark / Light Mode"
+                aria-label="Toggle Theme"
+            >
+                <span id="theme-icon" class="nav-circle-icon">🌙</span>
+            </button>
+
+            <!-- 2. NOTIFICATIONS BELL CIRCLE BUTTON & DROPDOWN -->
+            <div class="notif-wrapper">
+                <button
+                    type="button"
+                    id="notif-toggle-btn"
+                    class="nav-circle-btn"
+                    onclick="toggleNotifications()"
+                    title="Notifications"
+                    aria-label="View notifications"
+                >
+                    <span class="nav-circle-icon">🔔</span>
+                    <% if (unreadNotificationsCount > 0) { %>
+                        <span class="notif-badge"><%= unreadNotificationsCount %></span>
+                    <% } %>
+                </button>
+
+                <!-- NOTIFICATION DROPDOWN POPUP -->
+                <div id="notif-dropdown" class="notif-dropdown">
+                    <div class="notif-header">
+                        <div class="notif-header-title">
+                            <h4>Notifications</h4>
+                            <% if (unreadNotificationsCount > 0) { %>
+                                <span class="notif-count-pill"><%= unreadNotificationsCount %> new</span>
+                            <% } %>
+                        </div>
+                        <% if (unreadNotificationsCount > 0) { %>
+                            <form action="/notifications/mark-read" method="POST" style="margin:0;">
+                                <button type="submit" class="notif-mark-all">Mark all read</button>
+                            </form>
+                        <% } %>
+                    </div>
+
+                    <div class="notif-list">
+                        <% if (notifications && notifications.length > 0) { %>
+                            <% notifications.forEach(function(n) { %>
+                                <div class="notif-item <%= n.is_read ? '' : 'unread' %>">
+                                    <div class="notif-item-header">
+                                        <strong><%= n.title %></strong>
+                                        <small><%= new Date(n.created_at).toLocaleDateString() %></small>
+                                    </div>
+                                    <p><%= n.message %></p>
+                                </div>
+                            <% }); %>
+                        <% } else { %>
+                            <div class="notif-empty">
+                                <span>✨</span>
+                                <p>No notifications yet. You're all caught up!</p>
+                            </div>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. USER PROFILE CIRCLE BUTTON & DROPDOWN -->
+            <div class="profile-menu-wrapper">
+                <button
+                    type="button"
+                    id="profile-toggle-btn"
+                    class="nav-circle-btn profile-circle-btn"
+                    onclick="toggleProfileMenu()"
+                    title="Account: <%= user.name %>"
+                    aria-label="User Account Menu"
+                >
+                    <span class="avatar-initial"><%= user.name.charAt(0).toUpperCase() %></span>
+                </button>
+
+                <!-- PROFILE POPUP MENU -->
+                <div id="profile-dropdown" class="profile-dropdown-menu">
+                    <div class="profile-dropdown-header">
+                        <div class="header-avatar">
+                            <%= user.name.charAt(0).toUpperCase() %>
+                        </div>
+                        <div class="header-details">
+                            <div class="header-name"><%= user.name %></div>
+                            <div class="header-email"><%= user.email %></div>
+                        </div>
+                    </div>
+
+                    <div class="profile-menu-list">
+                        <button type="button" class="profile-menu-item" onclick="openSalaryModal()">
+                            <span class="icon">💰</span>
+                            <span>Salary & Available Funds</span>
+                        </button>
+                        <button type="button" class="profile-menu-item" onclick="openProfileModal()">
+                            <span class="icon">👤</span>
+                            <span>Edit Profile</span>
+                        </button>
+                        <button type="button" class="profile-menu-item" onclick="openSettingsModal()">
+                            <span class="icon">⚙️</span>
+                            <span>Settings & Currency</span>
+                        </button>
+                        <a href="/export-csv" class="profile-menu-item">
+                            <span class="icon">📥</span>
+                            <span>Export CSV Data</span>
+                        </a>
+                        <div class="profile-menu-divider"></div>
+                        <a href="/logout" class="profile-menu-item logout-item">
+                            <span class="icon">🚪</span>
+                            <span>Sign Out</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- =========================
+         MAIN CONTAINER
+    ========================== -->
+    <main class="container">
+
+        <!-- FLASH ALERTS -->
+        <div class="alerts-container">
+            <% if (typeof success_msg !== 'undefined' && success_msg) { %>
+                <div class="alert alert-success">
+                    <span><%= success_msg %></span>
+                </div>
+            <% } %>
+            <% if (typeof error_msg !== 'undefined' && error_msg) { %>
+                <div class="alert alert-error">
+                    <span><%= error_msg %></span>
+                </div>
+            <% } %>
+            <% if (typeof info_msg !== 'undefined' && info_msg) { %>
+                <div class="alert alert-info">
+                    <span><%= info_msg %></span>
+                </div>
+            <% } %>
+        </div>
+
+        <!-- HERO WELCOME HEADER -->
+        <section class="hero" style="margin-bottom: 20px;">
+            <p class="eyebrow">FINANCIAL DASHBOARD</p>
+            <h1>
+                Welcome, <span><%= user.name.split(' ')[0] %></span>
+            </h1>
+            <p class="hero-text">
+                Manage your transactions, track monthly expenses by category, and stay on top of your budget.
+            </p>
+        </section>
+
+        <!-- =====================================================
+             GREEN BOX: SALARY & AVAILABLE FUNDS
+        ====================================================== -->
+        <section class="money-card">
+            <div class="money-content">
+                <div class="money-text-col">
+                    <span class="section-label-badge">💰 SALARY & AVAILABLE FUNDS</span>
+                    <h2>Manage Available Money</h2>
+                    <p>Set or update your monthly budget / income. Your remaining balance updates automatically.</p>
+                </div>
+                <form action="/set-money" method="POST" class="money-form">
+                    <div class="money-input-wrap">
+                        <span class="money-currency-prefix"><%= currency %></span>
+                        <input
+                            type="number"
+                            name="available_money"
+                            value="<%= Math.round(available_money) %>"
+                            placeholder="0"
+                            min="0"
+                            step="any"
+                            required
+                        >
+                    </div>
+                    <button type="submit" class="money-submit-btn">
+                        + Update Salary / Balance
+                    </button>
+                </form>
+            </div>
+        </section>
+
+        <!-- TOP 4 SUMMARY STATS -->
+        <section class="stats-grid">
+            <!-- 1. AVAILABLE SALARY / FUNDS -->
+            <div class="stat-card" style="cursor: pointer;" onclick="openSalaryModal()" title="Click to update salary">
+                <div class="stat-icon"><%= currency %></div>
+                <div style="flex: 1;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <p>Available Salary</p>
+                        <span style="font-size: 11px; color: var(--green); font-weight: 600;">Edit ✏️</span>
+                    </div>
+                    <h2><%= currency %><%= Math.round(available_money).toLocaleString('en-IN') %></h2>
+                </div>
+            </div>
+
+            <!-- 2. TOTAL SPENT -->
+            <div class="stat-card">
+                <div class="stat-icon icon-spent">−</div>
+                <div>
+                    <p>Total Spendings</p>
+                    <h2><%= currency %><%= Math.round(total_expenses).toLocaleString('en-IN') %></h2>
+                </div>
+            </div>
+
+            <!-- 3. REMAINING BALANCE -->
+            <div class="stat-card">
+                <div class="stat-icon icon-balance">✓</div>
+                <div>
+                    <p>Remaining Balance</p>
+                    <h2 style="<%= balance < 0 ? 'color: var(--danger);' : '' %>">
+                        <%= currency %><%= Math.round(balance).toLocaleString('en-IN') %>
+                    </h2>
+                </div>
+            </div>
+
+            <!-- 4. TOTAL ENTRIES -->
+            <div class="stat-card">
+                <div class="stat-icon icon-categories">📊</div>
+                <div>
+                    <p>Tracked Entries</p>
+                    <h2><%= expenses.length %> Transactions</h2>
+                </div>
+            </div>
+        </section>
+
+        <!-- =====================================================
+             FINANCIAL MESSAGES & SAVINGS ADVICE CARD
+        ====================================================== -->
+        <% if (eomSummary) { %>
+            <div class="eom-summary-card">
+                <div class="eom-icon">
+                    <% if (balance < 0) { %>⚠️<% } else if (monthlyReport.savingsRate >= 50) { %>🎉<% } else { %>💡<% } %>
+                </div>
+                <div class="eom-text">
+                    <h4><%= eomSummary.title %></h4>
+                    <p><%= eomSummary.message %></p>
+                </div>
+            </div>
+        <% } %>
+
+        <!-- ==========================================
+             SPENDINGS & VISUAL ANALYTICS (PIE CHART)
+        =========================================== -->
+        <section class="reports-section">
+            <!-- MONTHLY REPORT SUMMARY -->
+            <div class="report-card">
+                <div class="report-header">
+                    <div>
+                        <p class="section-label">FINANCIAL REPORTS</p>
+                        <h3>Monthly Summary</h3>
+                    </div>
+
+                    <!-- MONTH SELECTOR -->
+                    <form action="/" method="GET" class="month-selector-form">
+                        <% if (searchQuery) { %><input type="hidden" name="q" value="<%= searchQuery %>"><% } %>
+                        <% if (selectedCategory) { %><input type="hidden" name="category" value="<%= selectedCategory %>"><% } %>
+                        <select name="month" class="month-select" onchange="this.form.submit()">
+                            <% availableMonths.forEach(function(m) { %>
+                                <option value="<%= m.value %>" <%= m.value === selectedMonth ? 'selected' : '' %>>
+                                    <%= m.label %>
+                                </option>
+                            <% }); %>
+                        </select>
+                    </form>
+                </div>
+
+                <div class="report-metrics">
+                    <div class="metric-box">
+                        <div class="metric-label">Month Salary / Budget</div>
+                        <div class="metric-val"><%= currency %><%= Math.round(monthlyReport.income).toLocaleString('en-IN') %></div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="metric-label">Month Expenses</div>
+                        <div class="metric-val" style="color: var(--danger);"><%= currency %><%= Math.round(monthlyReport.expenses).toLocaleString('en-IN') %></div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="metric-label">Estimated Savings</div>
+                        <div class="metric-val" style="color: var(--green);"><%= currency %><%= Math.round(monthlyReport.savings).toLocaleString('en-IN') %></div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="metric-label">Savings Rate</div>
+                        <div class="metric-val">
+                            <span class="savings-rate-badge"><%= monthlyReport.savingsRate %>%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="report-footer">
+                    <div class="report-footer-item">
+                        <span>Top Spending Category</span>
+                        <strong><%= monthlyReport.topCategory %></strong>
+                    </div>
+                    <div class="report-footer-item">
+                        <span>Total Entries</span>
+                        <strong><%= monthlyReport.count %> logged</strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CATEGORY SPENDINGS (CLEAN PIE / DOUGHNUT CHART) -->
+            <div class="chart-card">
+                <div class="report-header">
+                    <div>
+                        <p class="section-label">VISUAL ANALYTICS</p>
+                        <h3>Spending by Category</h3>
+                    </div>
+                    <div class="chart-badge">
+                        <span><%= currency %><%= Math.round(monthlyReport.expenses).toLocaleString('en-IN') %> Total</span>
+                    </div>
+                </div>
+
+                <div class="pie-chart-container">
+                    <div class="pie-chart-canvas-wrap">
+                        <canvas id="categoryChart"></canvas>
+                    </div>
+                    <div class="pie-category-legend" id="categoryLegend">
+                        <!-- Rendered by JavaScript dynamically with colors & percentages -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- =========================================================================
+             TRANSACTIONS & NEW TRANSACTION
+             ORDER: 1ST YOUR TRANSACTIONS (RECENT) | 2ND ADD EXPENSE FORM
+        ========================================================================= -->
+        <section id="transactions-section" class="dashboard">
+
+            <!-- =============================================================
+                 1ST CARD: YOUR TRANSACTIONS (RECENT EXPENSES & SEARCH/FILTER)
+            ============================================================== -->
+            <div class="card">
+                <div class="card-heading">
+                    <div>
+                        <p class="section-label">YOUR TRANSACTIONS</p>
+                        <h2>Recent Expenses (<%= expenses.length %>)</h2>
+                    </div>
+                    <div class="heading-icon">📋</div>
+                </div>
+
+                <!-- SEARCH & FILTER BAR -->
+                <div class="filter-bar">
+                    <form action="/#transactions-section" method="GET" class="filter-form">
+                        <% if (selectedMonth) { %><input type="hidden" name="month" value="<%= selectedMonth %>"><% } %>
+                        <input
+                            type="text"
+                            name="q"
+                            class="filter-input"
+                            placeholder="Search transactions..."
+                            value="<%= searchQuery %>"
+                        >
+
+                        <select name="category" class="filter-input">
+                            <option value="">All Categories</option>
+                            <option value="Food" <%= selectedCategory === 'Food' ? 'selected' : '' %>>Food</option>
+                            <option value="Travel" <%= selectedCategory === 'Travel' ? 'selected' : '' %>>Travel</option>
+                            <option value="Shopping" <%= selectedCategory === 'Shopping' ? 'selected' : '' %>>Shopping</option>
+                            <option value="Education" <%= selectedCategory === 'Education' ? 'selected' : '' %>>Education</option>
+                            <option value="Entertainment" <%= selectedCategory === 'Entertainment' ? 'selected' : '' %>>Entertainment</option>
+                            <option value="Health" <%= selectedCategory === 'Health' ? 'selected' : '' %>>Health</option>
+                            <option value="Bills" <%= selectedCategory === 'Bills' ? 'selected' : '' %>>Bills</option>
+                            <option value="Other" <%= selectedCategory === 'Other' ? 'selected' : '' %>>Other</option>
+                        </select>
+
+                        <div class="filter-actions">
+                            <button type="submit" class="btn-filter">Filter</button>
+                            <% if (searchQuery || selectedCategory) { %>
+                                <a href="/?month=<%= selectedMonth %>#transactions-section" class="btn-filter-reset">Reset</a>
+                            <% } %>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- EXPENSE LIST -->
+                <% if (expenses && expenses.length > 0) { %>
+                    <div class="expense-list">
+                        <% expenses.forEach(function(expense) { %>
+                            <div class="expense-item">
+                                <!-- LEFT INFO -->
+                                <div class="expense-left">
+                                    <div class="category-icon">
+                                        <%= (expense.category && expense.category.length > 0) ? expense.category[0] : '₹' %>
+                                    </div>
+                                    <div>
+                                        <h3><%= expense.expense_name %></h3>
+                                        <p><%= expense.description || "No description" %></p>
+                                        <small><%= expense.category %> · <%= expense.date %></small>
+                                    </div>
+                                </div>
+
+                                <!-- RIGHT ACTIONS -->
+                                <div class="expense-actions">
+                                    <div class="expense-amount">
+                                        <%= currency %><%= Math.round(expense.amount).toLocaleString('en-IN') %>
+                                    </div>
+
+                                    <a href="/edit/<%= expense.id %>" class="edit-button">Edit</a>
+
+                                    <form
+                                        action="/delete/<%= expense.id %>"
+                                        method="POST"
+                                        style="margin:0;"
+                                        onsubmit="return confirm('Are you sure you want to delete <%= expense.expense_name %> (<%= currency %><%= Math.round(expense.amount) %>)?');"
+                                    >
+                                        <button type="submit" class="delete-button">Delete</button>
+                                    </form>
+                                </div>
+                            </div>
+                        <% }); %>
+                    </div>
+                <% } else { %>
+                    <!-- EMPTY STATE -->
+                    <div class="empty-state">
+                        <div class="empty-icon">+</div>
+                        <h3>No transactions found</h3>
+                        <p>Use the Add Expense form on the right to log your first transaction.</p>
+                    </div>
+                <% } %>
+            </div>
+
+            <!-- =============================================================
+                 2ND CARD: NEW TRANSACTION (ADD EXPENSE FORM)
+            ============================================================== -->
+            <div class="card" id="add-expense-card">
+                <div class="card-heading">
+                    <div>
+                        <p class="section-label">NEW TRANSACTION</p>
+                        <h2>Add Expense</h2>
+                    </div>
+                    <div class="heading-icon">+</div>
+                </div>
+
+                <form action="/add" method="POST">
+                    <!-- EXPENSE NAME -->
+                    <div class="form-group">
+                        <label for="expense_name">Expense Name</label>
+                        <input
+                            type="text"
+                            id="expense_name"
+                            name="expense_name"
+                            placeholder="e.g. Grocery shopping"
+                            required
+                        >
+                    </div>
+
+                    <!-- AMOUNT + CATEGORY -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="amount">Amount (<%= currency %>)</label>
+                            <input
+                                type="number"
+                                id="amount"
+                                name="amount"
+                                placeholder="0"
+                                min="1"
+                                step="any"
+                                required
+                            >
+                        </div>
+
+                        <div class="form-group">
+                            <label for="category">Category</label>
+                            <select id="category" name="category" required>
+                                <option value="">Select</option>
+                                <option value="Food">Food</option>
+                                <option value="Travel">Travel</option>
+                                <option value="Shopping">Shopping</option>
+                                <option value="Education">Education</option>
+                                <option value="Entertainment">Entertainment</option>
+                                <option value="Health">Health</option>
+                                <option value="Bills">Bills & Utilities</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- DATE -->
+                    <div class="form-group">
+                        <label for="date">Date</label>
+                        <input
+                            type="date"
+                            id="date"
+                            name="date"
+                            value="<%= todayDate %>"
+                            required
+                        >
+                    </div>
+
+                    <!-- DESCRIPTION -->
+                    <div class="form-group">
+                        <label for="description">Description (Optional)</label>
+                        <textarea
+                            id="description"
+                            name="description"
+                            placeholder="Add notes, store name, or receipt details..."
+                        ></textarea>
+                    </div>
+
+                    <!-- SUBMIT -->
+                    <button type="submit" class="btn-primary">
+                        + Add Expense
+                    </button>
+                </form>
+            </div>
+
+        </section>
+
+        <!-- =====================================================
+             3 SIMPLE STEPS TO MASTER YOUR FINANCES
+        ====================================================== -->
+        <section class="information">
+            <div>
+                <p class="section-label">SMART MONEY HABITS</p>
+                <h2>3 Simple Steps to Master Your Finances</h2>
+                <p style="color: var(--muted); font-size: 13px; margin-top: 8px; line-height: 1.5;">
+                    Follow these core budgeting principles to eliminate financial stress and build long-term savings.
+                </p>
+            </div>
+            <div class="tips">
+                <div class="tip">
+                    <span>01 · SET BUDGET</span>
+                    <h3>Define Available Funds</h3>
+                    <p>Set your monthly income or allocated budget at the beginning of each cycle to set clear spending boundaries.</p>
+                </div>
+                <div class="tip">
+                    <span>02 · TRACK DAILY</span>
+                    <h3>Log Every Expense</h3>
+                    <p>Record transactions immediately with accurate categories to maintain real-time visibility over your cash flow.</p>
+                </div>
+                <div class="tip">
+                    <span>03 · CARRY FORWARD</span>
+                    <h3>Grow Your Net Savings</h3>
+                    <p>Review monthly visual analytics, stay below category limits, and save remaining surplus funds consistently.</p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- =========================
+         MODAL 1: SALARY & BUDGET
+    ========================== -->
+    <div id="salary-modal" class="app-modal-overlay">
+        <div class="app-modal-box">
+            <div class="app-modal-header">
+                <h3><span>💰</span> Manage Salary & Available Funds</h3>
+                <button type="button" class="app-modal-close" onclick="closeSalaryModal()">✕</button>
+            </div>
+
+            <form action="/set-money" method="POST">
+                <div class="form-group">
+                    <label for="modal_salary_input">Available Salary / Budget (<%= currency %>)</label>
+                    <input
+                        type="number"
+                        id="modal_salary_input"
+                        name="available_money"
+                        value="<%= Math.round(available_money) %>"
+                        placeholder="<%= currency %> 0"
+                        min="0"
+                        step="any"
+                        required
+                    >
+                    <small style="color: var(--muted); font-size: 11.5px; margin-top: 4px; display: block;">
+                        Your remaining balance will automatically calculate based on total logged expenses.
+                    </small>
+                </div>
+
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button type="button" class="btn-secondary" style="flex: 1;" onclick="closeSalaryModal()">Cancel</button>
+                    <button type="submit" class="btn-primary" style="flex: 1;">Update Salary</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- =========================
+         MODAL 2: EDIT PROFILE
+    ========================== -->
+    <div id="profile-modal" class="app-modal-overlay">
+        <div class="app-modal-box">
+            <div class="app-modal-header">
+                <h3><span>👤</span> Edit User Profile</h3>
+                <button type="button" class="app-modal-close" onclick="closeProfileModal()">✕</button>
+            </div>
+
+            <form action="/profile/update" method="POST">
+                <div class="form-group">
+                    <label for="profile_name">Full Name</label>
+                    <input
+                        type="text"
+                        id="profile_name"
+                        name="name"
+                        value="<%= user.name %>"
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="profile_email">Email Address</label>
+                    <input
+                        type="email"
+                        id="profile_email"
+                        name="email"
+                        value="<%= user.email %>"
+                        required
+                    >
+                    <small style="color: var(--muted); font-size: 11px; margin-top: 4px; display: block;">
+                        Your email is used for login verification and instant notifications.
+                    </small>
+                </div>
+
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button type="button" class="btn-secondary" style="flex: 1;" onclick="closeProfileModal()">Cancel</button>
+                    <button type="submit" class="btn-primary" style="flex: 1;">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- =========================
+         MODAL 3: SETTINGS & PREFERENCES
+    ========================== -->
+    <div id="settings-modal" class="app-modal-overlay">
+        <div class="app-modal-box">
+            <div class="app-modal-header">
+                <h3><span>⚙️</span> Preferences & Settings</h3>
+                <button type="button" class="app-modal-close" onclick="closeSettingsModal()">✕</button>
+            </div>
+
+            <form action="/settings/update" method="POST">
+                <div class="form-group">
+                    <label for="currency_setting">Primary Currency Symbol</label>
+                    <select id="currency_setting" name="currency">
+                        <option value="₹" <%= (currency === '₹') ? 'selected' : '' %>>₹ · Indian Rupee (INR)</option>
+                        <option value="$" <%= (currency === '$') ? 'selected' : '' %>>$ · US Dollar (USD)</option>
+                        <option value="€" <%= (currency === '€') ? 'selected' : '' %>>€ · Euro (EUR)</option>
+                        <option value="£" <%= (currency === '£') ? 'selected' : '' %>>£ · British Pound (GBP)</option>
+                        <option value="¥" <%= (currency === '¥') ? 'selected' : '' %>>¥ · Japanese Yen (JPY)</option>
+                        <option value="AED " <%= (currency === 'AED ') ? 'selected' : '' %>>AED · UAE Dirham</option>
+                    </select>
+                </div>
+
+                <div style="margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border);">
+                    <label style="font-weight: 600; font-size: 13px; color: var(--dark); display: block; margin-bottom: 6px;">
+                        Data Management
+                    </label>
+                    <a href="/export-csv" class="btn-secondary" style="display: flex; align-items: center; justify-content: center; width: 100%; text-align: center; text-decoration: none;">
+                        📥 Download All Expenses as CSV
+                    </a>
+                </div>
+
+                <div style="display: flex; gap: 10px; margin-top: 16px;">
+                    <button type="button" class="btn-secondary" style="flex: 1;" onclick="closeSettingsModal()">Close</button>
+                    <button type="submit" class="btn-primary" style="flex: 1;">Save Preferences</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <footer>
+        <p>Expense Tracker · Smart Personal Finance Management</p>
+    </footer>
+
+    <!-- JAVASCRIPT FOR THEME TOGGLE, PROFILE MENU, NOTIFICATIONS & PIE CHART -->
+    <script>
+        // ==========================================
+        // 1. THEME TOGGLE (DARK / LIGHT MODE)
+        // ==========================================
+        function updateThemeIcon() {
+            const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            const iconEl = document.getElementById('theme-icon');
+            if (iconEl) {
+                iconEl.textContent = isDark ? '☀️' : '🌙';
+            }
+        }
+
+        function toggleTheme() {
+            const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+            const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', nextTheme);
+            try {
+                localStorage.setItem('theme', nextTheme);
+            } catch (e) {}
+            updateThemeIcon();
+            if (window.myCategoryPieChart) {
+                window.myCategoryPieChart.update();
+            }
+        }
+
+        // Initialize Theme Icon on Load
+        document.addEventListener('DOMContentLoaded', function() {
+            updateThemeIcon();
+        });
+
+        // ==========================================
+        // 2. DROPDOWNS & MODAL CONTROLLERS
+        // ==========================================
+        function toggleNotifications() {
+            const dropdown = document.getElementById('notif-dropdown');
+            const profileMenu = document.getElementById('profile-dropdown');
+            if (profileMenu) profileMenu.classList.remove('show');
+            if (dropdown) dropdown.classList.toggle('show');
+        }
+
+        function toggleProfileMenu() {
+            const profileMenu = document.getElementById('profile-dropdown');
+            const notifDropdown = document.getElementById('notif-dropdown');
+            if (notifDropdown) notifDropdown.classList.remove('show');
+            if (profileMenu) profileMenu.classList.toggle('show');
+        }
+
+        function openSalaryModal() {
+            const profileMenu = document.getElementById('profile-dropdown');
+            if (profileMenu) profileMenu.classList.remove('show');
+            document.getElementById('salary-modal').style.display = 'flex';
+        }
+
+        function closeSalaryModal() {
+            document.getElementById('salary-modal').style.display = 'none';
+        }
+
+        function openProfileModal() {
+            const profileMenu = document.getElementById('profile-dropdown');
+            if (profileMenu) profileMenu.classList.remove('show');
+            document.getElementById('profile-modal').style.display = 'flex';
+        }
+
+        function closeProfileModal() {
+            document.getElementById('profile-modal').style.display = 'none';
+        }
+
+        function openSettingsModal() {
+            const profileMenu = document.getElementById('profile-dropdown');
+            if (profileMenu) profileMenu.classList.remove('show');
+            document.getElementById('settings-modal').style.display = 'flex';
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settings-modal').style.display = 'none';
+        }
+
+        // Close dropdowns & modals when clicking outside
+        window.addEventListener('click', function(e) {
+            const notifWrapper = document.querySelector('.notif-wrapper');
+            if (notifWrapper && !notifWrapper.contains(e.target)) {
+                const notifDrop = document.getElementById('notif-dropdown');
+                if (notifDrop) notifDrop.classList.remove('show');
+            }
+
+            const profWrapper = document.querySelector('.profile-menu-wrapper');
+            if (profWrapper && !profWrapper.contains(e.target)) {
+                const profDrop = document.getElementById('profile-dropdown');
+                if (profDrop) profDrop.classList.remove('show');
+            }
+
+            const salModal = document.getElementById('salary-modal');
+            if (e.target === salModal) closeSalaryModal();
+
+            const pModal = document.getElementById('profile-modal');
+            if (e.target === pModal) closeProfileModal();
+
+            const sModal = document.getElementById('settings-modal');
+            if (e.target === sModal) closeSettingsModal();
+        });
+
+        // ==========================================
+        // 3. PIE / DOUGHNUT CHART WITH LEGEND
+        // ==========================================
+        const categoryData = <%- JSON.stringify(chartCategoryData) %>;
+        const ctx = document.getElementById('categoryChart');
+        const legendContainer = document.getElementById('categoryLegend');
+
+        // Distinct category color mapping
+        const categoryColorMap = {
+            'Food': '#2e6f43',
+            'Travel': '#2563eb',
+            'Shopping': '#d97706',
+            'Education': '#0284c7',
+            'Entertainment': '#8b5cf6',
+            'Health': '#ec4899',
+            'Bills': '#ef4444',
+            'Other': '#64748b'
+        };
+
+        const defaultPalette = ['#2e6f43', '#2563eb', '#d97706', '#8b5cf6', '#ef4444', '#0284c7', '#ec4899', '#64748b'];
+
+        if (ctx && categoryData && categoryData.labels && categoryData.labels.length > 0) {
+            const backgroundColors = categoryData.labels.map((label, idx) =>
+                categoryColorMap[label] || defaultPalette[idx % defaultPalette.length]
+            );
+            const totalSpent = categoryData.values.reduce((a, b) => a + b, 0);
+
+            // Render category breakdown legend
+            if (legendContainer) {
+                legendContainer.innerHTML = categoryData.labels.map((label, i) => {
+                    const val = categoryData.values[i];
+                    const color = backgroundColors[i];
+                    const pct = totalSpent > 0 ? ((val / totalSpent) * 100).toFixed(1) : 0;
+                    return `
+                        <div class="legend-item">
+                            <div class="legend-item-left">
+                                <span class="legend-color-dot" style="background: ${color};"></span>
+                                <span class="legend-name" title="${label}">${label}</span>
+                            </div>
+                            <div class="legend-item-right">
+                                <span class="legend-amount"><%= currency %>${Math.round(val).toLocaleString('en-IN')}</span>
+                                <span class="legend-pct-pill">${pct}%</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            window.myCategoryPieChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: categoryData.labels,
+                    datasets: [{
+                        data: categoryData.values,
+                        backgroundColor: backgroundColors,
+                        hoverBackgroundColor: backgroundColors,
+                        borderWidth: 2,
+                        borderColor: '#ffffff',
+                        hoverOffset: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '62%',
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: '#181a1b',
+                            titleColor: '#ffffff',
+                            bodyColor: '#e5e7eb',
+                            borderColor: '#374151',
+                            borderWidth: 1,
+                            padding: 10,
+                            titleFont: { size: 12, weight: '700' },
+                            bodyFont: { size: 12, weight: '600' },
+                            cornerRadius: 8,
+                            boxPadding: 4,
+                            callbacks: {
+                                label: function(context) {
+                                    const val = context.raw || 0;
+                                    const pct = totalSpent > 0 ? ((val / totalSpent) * 100).toFixed(1) : 0;
+                                    return ` <%= currency %>${Math.round(val).toLocaleString('en-IN')} (${pct}%)`;
+                                }
+                            }
+                        }
+                    },
+                    animation: {
+                        animateScale: true,
+                        animateRotate: true,
+                        duration: 800
+                    }
+                }
+            });
+        } else if (ctx) {
+            if (legendContainer) {
+                legendContainer.innerHTML = `
+                    <div style="padding: 16px; text-align: center; color: var(--muted); font-size: 12.5px;">
+                        <span>📊</span>
+                        <p style="margin-top: 4px;">No expense records logged for this month.</p>
+                    </div>
+                `;
+            }
+            const ctx2d = ctx.getContext('2d');
+            ctx2d.font = '13px sans-serif';
+            ctx2d.fillStyle = '#9ca3af';
+            ctx2d.textAlign = 'center';
+            ctx2d.fillText('No spending data', 100, 100);
+        }
+    </script>
+</body>
+
+</html>

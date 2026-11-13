@@ -1,0 +1,6 @@
+{
+  "name": "Expense Tracker",
+  "description": "A personal finance expense tracker to keep track of spending, understand financial habits, and know available balance.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
